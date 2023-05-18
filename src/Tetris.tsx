@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { KeyboardEvent, useEffect, useState } from "react";
 
 const width = 10,
   height = 20;
@@ -63,13 +63,31 @@ const pieces: Piece[] = [
     label: "L",
     rotations: [
       [
+        { x: 1, y: -1 },
+        { x: 1, y: 0 },
+        { x: 0, y: 0 },
+        { x: -1, y: 0 },
+      ],
+      [
+        { x: -1, y: -1 },
+        { x: 0, y: -1 },
+        { x: 0, y: 0 },
+        { x: 0, y: 1 },
+      ],
+      [
+        { x: 0, y: 0 },
+        { x: 1, y: 0 },
+        { x: -1, y: 0 },
+        { x: -1, y: 1 },
+      ],
+      [
         { x: 0, y: -1 },
         { x: 0, y: 0 },
         { x: 0, y: 1 },
         { x: 1, y: 1 },
       ],
     ],
-    color: "red",
+    color: "orange",
   },
   {
     label: "J",
@@ -81,7 +99,7 @@ const pieces: Piece[] = [
         { x: -1, y: 1 },
       ],
     ],
-    color: "purple",
+    color: "blue",
   },
   {
     label: "X",
@@ -95,13 +113,49 @@ const pieces: Piece[] = [
     ],
     color: "yellow",
   },
+  {
+    label: "T",
+    rotations: [
+      [
+        { x: 0, y: -1 },
+        { x: 0, y: 0 },
+        { x: -1, y: 0 },
+        { x: 1, y: 0 },
+      ],
+    ],
+    color: "purple",
+  },
+  {
+    label: "\\",
+    rotations: [
+      [
+        { x: -1, y: -1 },
+        { x: -1, y: 0 },
+        { x: 0, y: 0 },
+        { x: 0, y: 1 },
+      ],
+    ],
+    color: "green",
+  },
+  {
+    label: "/",
+    rotations: [
+      [
+        { x: 1, y: -1 },
+        { x: 1, y: 0 },
+        { x: 0, y: 0 },
+        { x: 0, y: 1 },
+      ],
+    ],
+    color: "red",
+  }
 ];
 
 function randomPiece() {
   return pieces[Math.floor(Math.random() * pieces.length)];
 }
 
-function startingGame(width: number, height: number): Game {
+function getStartingGame(): Game {
   const startingPiece = randomPiece();
   const nextPiece = randomPiece();
 
@@ -121,8 +175,8 @@ function startingGame(width: number, height: number): Game {
     currentPiece: {
       piece: startingPiece,
       position: {
-        x: Math.floor(width / 2),
-        y: 1,
+        x: Math.floor(Math.random() * (width - 2) + 1),
+        y: 0,
       },
       rotation: Math.floor(Math.random() * startingPiece.rotations.length),
     },
@@ -134,8 +188,48 @@ function startingGame(width: number, height: number): Game {
   };
 }
 
+const startingGame = getStartingGame();
+
 export default function Tetris() {
-  const [game, setGame] = useState(startingGame(width, height));
+  const [game, setGame] = useState(startingGame);
+
+  useEffect(() => {
+    const tickInterval = setInterval(tick, 1000);
+
+    document.addEventListener('keydown', evt => {
+      if (evt.key === "ArrowUp" || evt.key === "w" || evt.key === "W") rotate();
+      if (evt.key === "ArrowRight" || evt.key === "d" || evt.key === "D") move(1);
+      if (evt.key === "ArrowLeft" || evt.key === "a" || evt.key === "A") move(-1);
+    })
+
+    return () => {
+      clearInterval(tickInterval);
+    }
+  }, []);
+
+  function tick() {
+    setGame(game => {
+      game.currentPiece.position.y += 1;
+
+      return { ...game }
+    })
+  }
+
+  function rotate() {
+    setGame(game => {
+      game.currentPiece.rotation = (game.currentPiece.rotation + 1) % game.currentPiece.piece.rotations.length;
+
+      return { ...game };
+    })
+  }
+
+  function move(direction: number) {
+    setGame(game => {
+      game.currentPiece.position.x += direction;
+
+      return { ...game };
+    })
+  }
 
   return (
     <div className="app" style={{ width: tileSize * width + tileSize * 4 }}>
@@ -181,7 +275,7 @@ function Display({ game }: DisplayProps) {
   );
 }
 
-function NextPiece({ nextPiece, nextRotation }: { nextPiece: Piece, nextRotation: number}) {
+function NextPiece({ nextPiece, nextRotation }: { nextPiece: Piece, nextRotation: number }) {
   const coordinates = nextPiece.rotations[nextRotation];
   const minX = Math.min(...coordinates.map((coord) => coord.x));
   const minY = Math.min(...coordinates.map((coord) => coord.y));
@@ -192,8 +286,6 @@ function NextPiece({ nextPiece, nextRotation }: { nextPiece: Piece, nextRotation
   const previewSize = Math.max(pieceWidth, pieceHeight);
   const pieceOffsetX = Math.floor((previewSize + 1) / 2);
   const pieceOffsetY = Math.floor((previewSize + 1) / 2);
-  console.log(pieceOffsetX);
-  console.log(pieceOffsetY);
 
   return (
     <div className="preview">
@@ -226,6 +318,8 @@ type FieldProps = {
 };
 
 function Field({ game }: FieldProps) {
+  const piecePositions = game.currentPiece.piece.rotations[game.currentPiece.rotation].map(coord => ({ x: coord.x + game.currentPiece.position.x, y: coord.y + game.currentPiece.position.y }));
+
   return (
     <div
       className="field"
@@ -236,10 +330,12 @@ function Field({ game }: FieldProps) {
         width: tileSize * width,
       }}
     >
-      {game.fieldState.map((column, columnIndex) =>
-        column.map((tile, rowIndex) => (
-          <Tile key={columnIndex * game.height + rowIndex} tile={tile} />
-        ))
+      {game.fieldState.map((column, rowIndex) =>
+        column.map((tile, columnIndex) => {
+          return <Tile key={columnIndex * game.height + rowIndex}
+            style={{ gridColumn: columnIndex + 1, gridRow: rowIndex + 1 }}
+            tile={piecePositions.findIndex(position => position.x === columnIndex && position.y === rowIndex) === -1 ? tile : { color: game.currentPiece.piece.color }} />
+        })
       )}
     </div>
   );
@@ -247,7 +343,8 @@ function Field({ game }: FieldProps) {
 
 type TileProps = {
   tile: TileType;
+  style?: React.CSSProperties;
 };
-function Tile({ tile }: TileProps) {
-  return <span className="tile" style={{ backgroundColor: tile?.color }} />;
+function Tile({ tile, style }: TileProps) {
+  return <span className="tile" style={{ ...style, backgroundColor: tile?.color }} />;
 }
