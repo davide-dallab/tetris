@@ -190,45 +190,59 @@ function getStartingGame(): Game {
 
 const startingGame = getStartingGame();
 
+let tickTimeout: number;
+let deltaTime = 500;
+
 export default function Tetris() {
   const [game, setGame] = useState(startingGame);
 
   useEffect(() => {
-    const tickInterval = setInterval(tick, 100);
+    tickTimeout = setTimeout(tick);
 
     document.addEventListener('keydown', evt => {
       if (evt.key === "ArrowUp" || evt.key === "w" || evt.key === "W") rotate();
       if (evt.key === "ArrowRight" || evt.key === "d" || evt.key === "D") move(1);
       if (evt.key === "ArrowLeft" || evt.key === "a" || evt.key === "A") move(-1);
+      if (evt.key === "ArrowDown" || evt.key === "s" || evt.key === "S") speedUp();
     })
 
     return () => {
-      clearInterval(tickInterval);
+      clearTimeout(tickTimeout);
     }
   }, []);
 
   function tick() {
     setGame(game => {
       game.currentPiece.position.y += 1;
-      const piecePositions = game.currentPiece.piece.rotations[game.currentPiece.rotation].map(coord => ({ x: coord.x + game.currentPiece.position.x, y: coord.y + game.currentPiece.position.y }));
-      if (piecePositions.findIndex(position => position.y < game.fieldState.length && position.x < game.fieldState[position.y].length && game.fieldState[position.y][position.x] || position.y >= height) !== -1) {
-        console.log("stop!");
-        piecePositions.forEach(position => game.fieldState[position.y - 1][position.x] = { color: game.currentPiece.piece.color });
-        game.currentPiece = {
-          piece: game.nextPiece,
-          position: {
-            x: Math.floor(Math.random() * (width - 2) + 1),
-            y: 0,
-          },
-          rotation: Math.floor(Math.random() * game.nextPiece.rotations.length)
-        }
-
-        game.nextPiece = randomPiece();
-        game.nextRotation = Math.floor(Math.random() * game.nextPiece.rotations.length);
-      }
+      checkCollisions(game);
 
       return { ...game }
-    })
+    });
+
+    deltaTime *= .999;
+
+    tickTimeout = setTimeout(tick, deltaTime);
+  }
+
+  function checkCollisions(game: Game) {
+    const piecePositions = game.currentPiece.piece.rotations[game.currentPiece.rotation].map(coord => ({ x: coord.x + game.currentPiece.position.x, y: coord.y + game.currentPiece.position.y }));
+    if (piecePositions.findIndex(position => position.y < game.fieldState.length && position.x < game.fieldState[position.y].length && game.fieldState[position.y][position.x] || position.y >= height) !== -1) {
+      piecePositions.forEach(position => game.fieldState[position.y - 1][position.x] = { color: game.currentPiece.piece.color });
+      game.currentPiece = {
+        piece: game.nextPiece,
+        position: {
+          x: Math.floor(Math.random() * (width - 2) + 1),
+          y: 0,
+        },
+        rotation: game.nextRotation
+      };
+
+      game.nextPiece = randomPiece();
+      game.nextRotation = Math.floor(Math.random() * game.nextPiece.rotations.length);
+
+      return true;
+    }
+    return false;
   }
 
   function rotate() {
@@ -243,8 +257,16 @@ export default function Tetris() {
     setGame(game => {
       game.currentPiece.position.x += direction;
 
+      if(checkCollisions(game))
+        game.currentPiece.position.x -= direction;
+
       return { ...game };
     })
+  }
+
+  function speedUp(){
+    clearTimeout(tickTimeout);
+    tickTimeout = setTimeout(tick);
   }
 
   return (
