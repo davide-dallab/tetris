@@ -63,16 +63,10 @@ const pieces: Piece[] = [
     label: "L",
     rotations: [
       [
-        { x: 1, y: -1 },
-        { x: 1, y: 0 },
-        { x: 0, y: 0 },
-        { x: -1, y: 0 },
-      ],
-      [
-        { x: -1, y: -1 },
         { x: 0, y: -1 },
         { x: 0, y: 0 },
         { x: 0, y: 1 },
+        { x: 1, y: 1 },
       ],
       [
         { x: 0, y: 0 },
@@ -81,10 +75,16 @@ const pieces: Piece[] = [
         { x: -1, y: 1 },
       ],
       [
+        { x: -1, y: -1 },
         { x: 0, y: -1 },
         { x: 0, y: 0 },
         { x: 0, y: 1 },
-        { x: 1, y: 1 },
+      ],
+      [
+        { x: 1, y: -1 },
+        { x: 1, y: 0 },
+        { x: 0, y: 0 },
+        { x: -1, y: 0 },
       ],
     ],
     color: "orange",
@@ -97,6 +97,24 @@ const pieces: Piece[] = [
         { x: 0, y: 0 },
         { x: 0, y: 1 },
         { x: -1, y: 1 },
+      ],
+      [
+        { x: 0, y: 0 },
+        { x: 1, y: 0 },
+        { x: -1, y: 0 },
+        { x: -1, y: -1 },
+      ],
+      [
+        { x: 1, y: -1 },
+        { x: 0, y: -1 },
+        { x: 0, y: 0 },
+        { x: 0, y: 1 },
+      ],
+      [
+        { x: 1, y: 1 },
+        { x: 1, y: 0 },
+        { x: 0, y: 0 },
+        { x: -1, y: 0 },
       ],
     ],
     color: "blue",
@@ -122,6 +140,24 @@ const pieces: Piece[] = [
         { x: -1, y: 0 },
         { x: 1, y: 0 },
       ],
+      [
+        { x: 0, y: -1 },
+        { x: 0, y: 0 },
+        { x: 0, y: 1 },
+        { x: 1, y: 0 },
+      ],
+      [
+        { x: 0, y: 1 },
+        { x: 0, y: 0 },
+        { x: -1, y: 0 },
+        { x: 1, y: 0 },
+      ],
+      [
+        { x: 0, y: -1 },
+        { x: 0, y: 0 },
+        { x: -1, y: 0 },
+        { x: 0, y: 1 },
+      ],
     ],
     color: "purple",
   },
@@ -134,6 +170,12 @@ const pieces: Piece[] = [
         { x: 0, y: 0 },
         { x: 0, y: 1 },
       ],
+      [
+        { x: 1, y: 0 },
+        { x: -1, y: 1 },
+        { x: 0, y: 0 },
+        { x: 0, y: 1 },
+      ],
     ],
     color: "green",
   },
@@ -143,6 +185,12 @@ const pieces: Piece[] = [
       [
         { x: 1, y: -1 },
         { x: 1, y: 0 },
+        { x: 0, y: 0 },
+        { x: 0, y: 1 },
+      ],
+      [
+        { x: -1, y: 0 },
+        { x: 1, y: 1 },
         { x: 0, y: 0 },
         { x: 0, y: 1 },
       ],
@@ -175,7 +223,7 @@ function getStartingGame(): Game {
     currentPiece: {
       piece: startingPiece,
       position: {
-        x: Math.floor(Math.random() * (width - 2) + 1),
+        x: Math.floor(Math.random() * (width - 4) + 2),
         y: 0,
       },
       rotation: Math.floor(Math.random() * startingPiece.rotations.length),
@@ -195,7 +243,7 @@ let deltaTime = 500;
 
 export default function Tetris() {
   const [game, setGame] = useState(startingGame);
-
+  
   useEffect(() => {
     tickTimeout = setTimeout(tick);
 
@@ -214,7 +262,24 @@ export default function Tetris() {
   function tick() {
     setGame(game => {
       game.currentPiece.position.y += 1;
-      checkCollisions(game);
+
+      if (checkCollisions(game))
+        blockPiece(game);
+      
+      let poppedLines = 0;
+      
+      lineloop: for(let line = height - 1; line >= 0; line--){
+        for(let tile = 0; tile < width; tile++){
+          if(!game.fieldState[line][tile]) continue lineloop;
+        }
+        for(let lineToSwitch = line - 1; lineToSwitch >= 0; lineToSwitch--){
+          for(let tile = 0; tile < width; tile++) game.fieldState[lineToSwitch + 1][tile] = game.fieldState[lineToSwitch][tile];
+        }
+        line++;
+        poppedLines++;
+      }
+
+      game.score += poppedLines === 1 ? 100 : poppedLines === 2 ? 250 : poppedLines === 3 ? 500 : poppedLines === 4 ? 1000 : 0;
 
       return { ...game }
     });
@@ -226,28 +291,51 @@ export default function Tetris() {
 
   function checkCollisions(game: Game) {
     const piecePositions = game.currentPiece.piece.rotations[game.currentPiece.rotation].map(coord => ({ x: coord.x + game.currentPiece.position.x, y: coord.y + game.currentPiece.position.y }));
-    if (piecePositions.findIndex(position => position.y < game.fieldState.length && position.x < game.fieldState[position.y].length && game.fieldState[position.y][position.x] || position.y >= height) !== -1) {
-      piecePositions.forEach(position => game.fieldState[position.y - 1][position.x] = { color: game.currentPiece.piece.color });
-      game.currentPiece = {
-        piece: game.nextPiece,
-        position: {
-          x: Math.floor(Math.random() * (width - 2) + 1),
-          y: 0,
-        },
-        rotation: game.nextRotation
-      };
+    return piecePositions.findIndex(position => position.y < height && position.x < width && game.fieldState[position.y] && game.fieldState[position.y][position.x] || position.y >= height) !== -1;
+  }
 
-      game.nextPiece = randomPiece();
-      game.nextRotation = Math.floor(Math.random() * game.nextPiece.rotations.length);
+  function blockPiece(game: Game) {
+    const piecePositions = game.currentPiece.piece.rotations[game.currentPiece.rotation].map(coord => ({ x: coord.x + game.currentPiece.position.x, y: coord.y + game.currentPiece.position.y }));
+    piecePositions.forEach(position => game.fieldState[position.y - 1][position.x] = { color: game.currentPiece.piece.color });
+    game.currentPiece = {
+      piece: game.nextPiece,
+      position: {
+        x: Math.floor(Math.random() * (width - 4) + 2),
+        y: 0,
+      },
+      rotation: game.nextRotation
+    };
 
-      return true;
+    if(checkCollisions(game)){
+      game.gameState = "ended";
     }
-    return false;
+
+    game.nextPiece = randomPiece();
+    game.nextRotation = Math.floor(Math.random() * game.nextPiece.rotations.length);
+  }
+
+  function isOutLeft(game: Game) {
+    const piecePositions = game.currentPiece.piece.rotations[game.currentPiece.rotation].map(coord => ({ x: coord.x + game.currentPiece.position.x, y: coord.y + game.currentPiece.position.y }));
+    return piecePositions.findIndex(position => position.x < 0) !== -1;
+  }
+
+  function isOutRight(game: Game) {
+    const piecePositions = game.currentPiece.piece.rotations[game.currentPiece.rotation].map(coord => ({ x: coord.x + game.currentPiece.position.x, y: coord.y + game.currentPiece.position.y }));
+    return piecePositions.findIndex(position => position.x >= width) !== -1;
+  }
+
+  function isOut(game: Game) {
+    return isOutLeft(game) || isOutRight(game);
   }
 
   function rotate() {
     setGame(game => {
       game.currentPiece.rotation = (game.currentPiece.rotation + 1) % game.currentPiece.piece.rotations.length;
+
+      if(isOutLeft(game))
+        game.currentPiece.position.x += 1;
+      else if(isOutRight(game))
+        game.currentPiece.position.x -= 1;
 
       return { ...game };
     })
@@ -257,8 +345,9 @@ export default function Tetris() {
     setGame(game => {
       game.currentPiece.position.x += direction;
 
-      if(checkCollisions(game))
+      if(checkCollisions(game) || isOut(game)){
         game.currentPiece.position.x -= direction;
+      }
 
       return { ...game };
     })
